@@ -1,0 +1,115 @@
+Hãy tạo cho tôi một Microsoft Edge Extension (Chromium-based, Manifest V3) có khả năng phát hiện và tải mọi loại video trên trang web, bao gồm cả những video không thể tải trực tiếp. Yêu cầu chi tiết:
+
+---
+
+## **1. Phát hiện mọi loại video**
+
+Extension phải có thể phát hiện và thu thập toàn bộ nguồn video theo các cấp độ sau:
+
+### **Level 1 — Direct video URL**
+
+* mp4, webm, mov, avi, mkv…
+
+### **Level 2 — Video blob URL**
+
+* Phải hook:
+
+  * `fetch`
+  * `XMLHttpRequest`
+* Lấy được link thật trước khi browser tạo blob.
+
+### **Level 3 — Streaming dạng HLS / DASH**
+
+* Phát hiện `.m3u8`, `.ts`, `.mpd`, `.m4s`
+* Extension phải:
+
+  * Tải playlist
+  * Parse danh sách segment
+  * Tải toàn bộ segment
+  * Ghép thành video hoàn chỉnh (dùng ffmpeg.wasm hoặc worker)
+
+### **Level 4 — MediaSource Extension (MSE)**
+
+* Hook:
+
+  * `MediaSource.prototype.addSourceBuffer`
+  * `SourceBuffer.prototype.appendBuffer`
+* Thu thập mọi fragment video được append.
+* Ghép các fragment thành MP4 có thể tải được.
+
+---
+
+## **2. Bypass các giới hạn tải**
+
+Thêm cơ chế vượt qua các chặn phổ biến:
+
+* Fake `Referer`
+* Fake `User-Agent`
+* Duy trì cookie/session khi tải
+* Bypass CORS bằng webRequest (nếu có thể)
+* Chặn header cấm download
+* Xử lý link tạm thời (signed URL)
+
+Dùng:
+
+* `chrome.webRequest.onBeforeSendHeaders`
+* `extraHeaders`
+
+---
+
+## **3. Cấu trúc file yêu cầu**
+
+Extension gồm:
+
+* `manifest.json`
+* `background.js` (service worker)
+* `content-script.js`
+* `fetch-hook.js`
+* `xhr-hook.js`
+* `mse-hook.js`
+* `hls-downloader.js`
+* `dash-downloader.js`
+* Popup UI:
+
+  * `popup.html`
+  * `popup.js`
+  * `popup.css`
+
+---
+
+## **4. Popup UI**
+
+* Hiển thị danh sách tất cả video phát hiện được (direct, blob, HLS, DASH, MSE)
+* Mỗi video phải có:
+
+  * nút **Download**
+  * thông tin loại nguồn
+  * kích thước (nếu có)
+  * số phân mảnh (nếu dạng stream)
+
+---
+
+## **5. Code yêu cầu**
+
+* Viết *toàn bộ code hoàn chỉnh* cho tất cả file.
+* Không viết code demo; phải chạy được thật.
+* Giải thích rõ từng phần cơ chế hoạt động.
+* Nếu cần Web Worker hãy tạo file riêng.
+* Nếu dùng ffmpeg.wasm hãy hướng dẫn cách embed.
+
+---
+
+## **6. Build & test**
+
+* Hướng dẫn cách load extension vào Edge/Chrome
+* Hướng dẫn test với:
+
+  * video direct
+  * blob video
+  * m3u8 stream
+  * dash stream
+  * video qua MSE
+
+---
+
+Hãy tạo toàn bộ project extension hoàn chỉnh, bao gồm tất cả file mã nguồn, cấu trúc dự án, giải thích chi tiết cơ chế hoạt động, và ví dụ minh họa.

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>Video Sniffer</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="title">Video Sniffer</div>
+      <div class="subtitle">Phát hiện & tải video</div>
+    </header>
+
+    <main class="main">
+      <section id="status" class="status">Đang quét video trên trang hiện tại...</section>
+      <ul id="video-list" class="video-list"></ul>
+    </main>
+
+    <template id="video-item-template">
+      <li class="video-item">
+        <div class="video-meta">
+          <div class="video-url"></div>
+          <div class="video-tags"></div>
+        </div>
+        <div class="video-actions">
+          <button class="btn btn-download">Download</button>
+        </div>
+      </li>
+    </template>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
+

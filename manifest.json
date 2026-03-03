@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "Universal Video Sniffer & Downloader",
+  "description": "Phát hiện và tải mọi loại video (direct, blob, HLS, DASH, MSE) trên mọi website.",
+  "version": "1.0.0",
+  "minimum_chrome_version": "109",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "downloads",
+    "scripting",
+    "activeTab",
+    "webRequest",
+    "webRequestBlocking"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Video Sniffer",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "fetch-hook.js",
+        "xhr-hook.js",
+        "mse-hook.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "optional_host_permissions": [
+    "<all_urls>"
+  ]
+}
+
