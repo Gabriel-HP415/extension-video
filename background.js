@@ -9,6 +9,21 @@ const DOWNLOAD_REQUEST_META = new Map(); // key: downloadUrl, value: { referer, 
 const DEFAULT_FAKE_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
 
+// Worker context trong Manifest V3 không hỗ trợ URL.createObjectURL cho Blob như window.
+// Ta chuyển Blob sang data: URL (base64) rồi mới gọi chrome.downloads.download.
+async function blobToDataUrl(blob) {
+  const buffer = await blob.arrayBuffer();
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.length;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const base64 = btoa(binary);
+  const mime = blob.type || "application/octet-stream";
+  return `data:${mime};base64,${base64}`;
+}
+
 /**
  * Tạo / lấy store cho 1 tab
  */
@@ -154,34 +169,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (type === "VIDEO_SNIFFER_DOWNLOAD_MSE_ASSEMBLED") {
-    // Nhận blob từ content-script (array buffer) và tải
+    // Nhận buffer từ content-script (ArrayBuffer) và tải dưới dạng data URL
     const { mimeType, buffer, fileNameHint } = message;
     const blob = new Blob([buffer], { type: mimeType || "video/mp4" });
-    const url = URL.createObjectURL(blob);
     const fileName =
       fileNameHint ||
       `mse_capture_${new Date().toISOString().replace(/[:.]/g, "_")}.mp4`;
 
-    chrome.downloads.download(
-      {
-        url,
-        filename: fileName,
-        conflictAction: "uniquify",
-        saveAs: true
-      },
-      (downloadId) => {
-        if (chrome.runtime.lastError) {
-          sendResponse?.({
-            ok: false,
-            error: chrome.runtime.lastError.message
-          });
-        } else {
-          sendResponse?.({ ok: true, downloadId });
-        }
-        // Thu hồi URL tạm
-        setTimeout(() => URL.revokeObjectURL(url), 30_000);
-      }
-    );
+    blobToDataUrl(blob)
+      .then((dataUrl) => {
+        chrome.downloads.download(
+          {
+            url: dataUrl,
+            filename: fileName,
+            conflictAction: "uniquify",
+            saveAs: true
+          },
+          (downloadId) => {
+            if (chrome.runtime.lastError) {
+              sendResponse?.({
+                ok: false,
+                error: chrome.runtime.lastError.message
+              });
+            } else {
+              sendResponse?.({ ok: true, downloadId });
+            }
+          }
+        );
+      })
+      .catch((e) => {
+        sendResponse?.({ ok: false, error: String(e) });
+      });
     return true;
   }
 
@@ -248,7 +266,6 @@ async function handleStreamDownload(tabId, videoId, type) {
     }
 
     const { blob, mimeType, filenameHint } = result;
-    const url = URL.createObjectURL(blob);
     const fileName =
       filenameHint ||
       buildFileNameFromVideo({
@@ -256,10 +273,12 @@ async function handleStreamDownload(tabId, videoId, type) {
         kind: type === "hls" ? "hls" : "dash"
       });
 
+    const dataUrl = await blobToDataUrl(blob);
+
     await new Promise((resolve, reject) => {
       chrome.downloads.download(
         {
-          url,
+          url: dataUrl,
           filename: fileName,
           conflictAction: "uniquify",
           saveAs: true
@@ -273,61 +292,9 @@ async function handleStreamDownload(tabId, videoId, type) {
         }
       );
     });
-
-    setTimeout(() => URL.revokeObjectURL(url), 30_000);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: String(e) };
   }
 }
-
-/**
- * Bypass / fake header với webRequest
- */
-chrome.webRequest.onBeforeSendHeaders.addListener(
-  (details) => {
-    const meta = DOWNLOAD_REQUEST_META.get(details.url);
-    if (!meta) return {};
-
-    let hasReferer = false;
-    let hasUA = false;
-
-    for (const header of details.requestHeaders || []) {
-      if (header.name.toLowerCase() === "referer") {
-        hasReferer = true;
-        header.value = meta.referer || header.value;
-      }
-      if (header.name.toLowerCase() === "user-agent") {
-        hasUA = true;
-        header.value = meta.userAgent || header.value;
-      }
-    }
-
-    if (!hasReferer && meta.referer) {
-      (details.requestHeaders || []).push({
-        name: "Referer",
-        value: meta.referer
-      });
-    }
-    if (!hasUA && meta.userAgent) {
-      (details.requestHeaders || []).push({
-        name: "User-Agent",
-        value: meta.userAgent
-      });
-    }
-
-    // Có thể xoá header cấm download (VD: x-content-type-options, content-disposition) nếu cần
-    const filtered = (details.requestHeaders || []).filter((h) => {
-      const name = h.name.toLowerCase();
-      if (name === "x-content-type-options") return false;
-      return true;
-    });
-
-    return { requestHeaders: filtered };
-  },
-  {
-    urls: ["<all_urls>"]
-  },
-  ["blocking", "requestHeaders", "extraHeaders"]
-);
 

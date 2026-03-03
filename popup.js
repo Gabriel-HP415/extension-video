@@ -28,13 +28,24 @@ async function init() {
     return;
   }
 
-  const videos = res.videos || [];
+  let videos = res.videos || [];
   if (videos.length === 0) {
     statusEl.textContent = "Chưa phát hiện được video. Hãy reload trang và thử phát video.";
     return;
   }
 
-  statusEl.textContent = `Đã phát hiện ${videos.length} nguồn video. Chọn nguồn phù hợp và bấm Download.`;
+  // Sắp xếp: ưu tiên direct/hls/dash trước, trong cùng loại thì MSE lớn đứng trên
+  const kindPriority = { direct: 0, hls: 1, dash: 2, mse: 3 };
+  videos = videos.slice().sort((a, b) => {
+    const ka = kindPriority[a.kind] ?? 99;
+    const kb = kindPriority[b.kind] ?? 99;
+    if (ka !== kb) return ka - kb;
+    const sa = a.size || 0;
+    const sb = b.size || 0;
+    return sb - sa;
+  });
+
+  statusEl.textContent = `Đã phát hiện ${videos.length} nguồn video. Thường video chính có dung lượng lớn nhất.`;
 
   videos.forEach((video) => {
     const node = template.content.firstElementChild.cloneNode(true);
@@ -55,6 +66,21 @@ async function init() {
       m.className = "tag tag-small";
       m.textContent = video.method;
       tagsEl.appendChild(m);
+    }
+
+    // Với MSE, hiển thị loại track (VIDEO/AUDIO) dựa trên mimeType
+    if (video.kind === "mse" && video.extra && video.extra.mimeType) {
+      const typeTag = document.createElement("span");
+      typeTag.className = "tag tag-small";
+      const lowerMime = video.extra.mimeType.toLowerCase();
+      if (lowerMime.includes("video/")) {
+        typeTag.textContent = "VIDEO track";
+      } else if (lowerMime.includes("audio/")) {
+        typeTag.textContent = "AUDIO track";
+      } else {
+        typeTag.textContent = video.extra.mimeType;
+      }
+      tagsEl.appendChild(typeTag);
     }
 
     if (video.fragmentCount != null) {

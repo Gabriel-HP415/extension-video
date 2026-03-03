@@ -11,7 +11,9 @@
   if (window.__VIDEO_SNIFFER_MSE_HOOKED__) return;
   window.__VIDEO_SNIFFER_MSE_HOOKED__ = true;
 
-  const MAX_TOTAL_BYTES_PER_STREAM = 100 * 1024 * 1024; // ~100MB để tránh tràn bộ nhớ
+  // Giới hạn kích thước mỗi stream MSE để tránh tràn bộ nhớ.
+  // Ở YouTube, video ~30 phút thường < 300–400MB, nên để 512MB là hợp lý.
+  const MAX_TOTAL_BYTES_PER_STREAM = 512 * 1024 * 1024; // ~512MB
 
   const store = (window.__videoSnifferMSEStore = {
     streams: {}, // streamId -> { mimeType, fragments: [Uint8Array], totalBytes }
